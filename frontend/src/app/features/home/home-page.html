@@ -1,0 +1,41 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>Games App</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="container">
+    <div class="welcome-section">
+      <h1>Witaj, {{ currentUser()?.name }}!</h1>
+      <p>Wybierz grę i zacznij grać</p>
+      <p class="connection-status" [class.connected]="isConnected()">
+        {{ isConnected() ? '✅ Połączono' : '❌ Rozłączono' }}
+      </p>
+    </div>
+
+    <div class="games-grid">
+      <ion-card (click)="navigateToGame('pictionary')" class="game-card">
+        <ion-card-header>
+          <ion-card-title>🎨 Pictionary</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <p>Rysuj i zgaduj! Gra multiplayer dla wielu graczy.</p>
+          <ion-button expand="block" fill="outline">
+            <ion-icon name="play-outline" slot="start"></ion-icon>
+            Graj
+          </ion-button>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card class="game-card coming-soon">
+        <ion-card-header>
+          <ion-card-title>🚀 Wkrótce</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <p>Wkrótce więcej gier!</p>
+        </ion-card-content>
+      </ion-card>
+    </div>
+  </div>
+</ion-content>

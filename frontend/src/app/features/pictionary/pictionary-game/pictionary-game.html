@@ -1,0 +1,45 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>Pictionary - Game</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="container">
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Room: {{ roomId() }}</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <p>Gracze w grze ({{ players().length }}/{{ maxPlayers() }}):</p>
+        <ion-list>
+          <ion-item *ngFor="let player of players()">
+            <ion-label>{{ player.name }}</ion-label>
+            <ion-badge *ngIf="player.token === currentPlayerToken()" color="primary">Ty</ion-badge>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Gra</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <p>Funkcjonalność gry będzie tutaj (canvas do rysowania, zgadywanie, itp.)</p>
+        <p class="status">Status: {{ gameStatus() }}</p>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-button expand="block" color="danger" (click)="leaveGame()">
+      Opuść grę
+    </ion-button>
+  </div>
+
+  <ion-toast
+    [isOpen]="showToast()"
+    [message]="toastMessage()"
+    [duration]="3000"
+    (didDismiss)="showToast.set(false)"
+  ></ion-toast>
+</ion-content>
