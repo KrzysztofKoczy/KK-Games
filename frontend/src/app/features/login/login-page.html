@@ -1,6 +1,6 @@
 <ion-header [translucent]="true">
   <ion-toolbar>
-    <ion-title>Logowanie</ion-title>
+    <ion-title>KK - Games</ion-title>
   </ion-toolbar>
 </ion-header>
 
@@ -8,13 +8,26 @@
   <div class="container">
     <ion-card>
       <ion-card-header>
-        <ion-card-title>Logowanie</ion-card-title>
+        <ion-card-title>Zaloguj się</ion-card-title>
       </ion-card-header>
       <ion-card-content>
+
+      <form [formGroup]="form" (ngSubmit)="submit()">
+          <ion-input labelPlacement="floating" helperText="Wpisz swój email" errorText="Niepoprawny email" label="Email" formControlName="email" type="email" required maxlength="256"></ion-input>
+
+          <ion-input labelPlacement="floating" helperText="Wpisz swoje hasło" label="Hasło" errorText="Niepoprawny hasło" formControlName="password" type="password" required maxlength="128"></ion-input>
+  
+         <ion-button expand="block" type="submit" [disabled]="form.invalid">Zaloguj się</ion-button>
+ 
+      </form>
+      <!-- @if (errorMsg()) {
+        <mat-error>{{ errorMsg() }}</mat-error>
+      }  -->
+
         <p>Funkcja logowania będzie dostępna wkrótce.</p>
         <p>Na razie możesz korzystać z trybu gościa.</p>
         <ion-button expand="block" routerLink="/home">
-          Wróć do strony głównej
+          Zaloguj jako gość
         </ion-button>
       </ion-card-content>
     </ion-card>
