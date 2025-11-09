@@ -1,8 +1,11 @@
-/*
-  Global Styles
-*/
-
+@import "@ionic/angular/css/core.css";
+@import "@ionic/angular/css/typography.css";
+@import "@ionic/angular/css/padding.css";
 @import '@ionic/angular/css/palettes/dark.class.css';
+@import '@ionic/angular/css/normalize.css';
+@import '@ionic/angular/css/structure.css';
+@import '@ionic/angular/css/display.css';
+@import '@ionic/angular/css/flex-utils.css';
 
 * {
   box-sizing: border-box;
@@ -14,3 +17,9 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}

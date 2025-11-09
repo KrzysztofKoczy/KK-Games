@@ -8,11 +8,11 @@ export const routes: Routes = [
   },
   {
     path: 'home',
-    loadComponent: () => import('./features/home/home-page').then(m => m.HomePage)
+    loadChildren: () => import('./features/home/home.routes').then(m => m.routes)
   },
   {
     path: 'login',
-    loadComponent: () => import('./features/login/login-page').then(m => m.LoginPage)
+    loadChildren: () => import('./features/login/login.routes').then(m => m.routes)
   },
   {
     path: 'pictionary',
