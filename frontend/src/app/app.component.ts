@@ -1,10 +1,9 @@
 import { Component, signal, OnInit, effect } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
 import { IonApp, IonHeader, IonRouterOutlet, IonTitle, IonToggle, IonToolbar } from '@ionic/angular/standalone';
 
 @Component({
   selector: 'app-root',
-  imports: [IonApp, IonRouterOutlet, RouterOutlet, IonToggle, IonToolbar, IonTitle, IonHeader],
+  imports: [IonApp, IonRouterOutlet, IonToggle, IonToolbar, IonTitle, IonHeader],
   templateUrl: './app.html',
 })
 export class AppComponent implements OnInit {

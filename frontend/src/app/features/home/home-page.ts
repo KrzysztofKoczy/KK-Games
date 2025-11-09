@@ -11,8 +11,6 @@ import {
   IonCardHeader,
   IonCardTitle,
   IonCardContent,
-  IonItem,
-  IonLabel,
   IonIcon
 } from '@ionic/angular/standalone';
 import { addCircleOutline, peopleOutline, playOutline } from 'ionicons/icons';
@@ -35,8 +33,6 @@ import { SocketService } from '../../core/socket/socket.service';
     IonCardHeader,
     IonCardTitle,
     IonCardContent,
-    IonItem,
-    IonLabel,
     IonIcon
   ],
   templateUrl: './home-page.html',
@@ -63,6 +59,10 @@ export class HomePage implements OnInit {
   }
 
   navigateToGame(gameType: string): void {
+    // Usuń focus z elementu przed nawigacją (rozwiązuje problem z aria-hidden)
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     this.router.navigate(['/', gameType]);
   }
 }

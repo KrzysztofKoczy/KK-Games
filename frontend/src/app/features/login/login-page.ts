@@ -3,17 +3,12 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import {
   IonContent,
-  IonHeader,
-  IonTitle,
-  IonToolbar,
   IonButton,
   IonCard,
   IonCardHeader,
   IonCardTitle,
   IonCardContent,
   IonInput,
-  IonLabel,
-  IonItem
 } from '@ionic/angular/standalone';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
@@ -24,13 +19,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
     CommonModule,
     RouterModule,
     ReactiveFormsModule,
-    IonItem,
-    IonLabel,
     IonInput,   
     IonContent,
-    IonHeader,
-    IonTitle,
-    IonToolbar,
     IonButton,
     IonCard,
     IonCardHeader,
@@ -72,5 +62,13 @@ export class LoginPage {
     //   }
     // });
 	}
+
+  navigateToHome(): void {
+    // Usuń focus z przycisku przed nawigacją (rozwiązuje problem z aria-hidden)
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    this.router.navigate(['/home']);
+  }
 }
 

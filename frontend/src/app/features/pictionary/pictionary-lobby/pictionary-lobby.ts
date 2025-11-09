@@ -16,7 +16,6 @@ import {
   IonItem,
   IonLabel,
   IonIcon,
-  IonAlert,
   IonToast
 } from '@ionic/angular/standalone';
 import { addCircleOutline, enterOutline } from 'ionicons/icons';
@@ -43,7 +42,6 @@ import { GuestAuthService } from '../../../core/auth/guest-auth.service';
     IonItem,
     IonLabel,
     IonIcon,
-    IonAlert,
     IonToast
   ],
   templateUrl: './pictionary-lobby.html',
