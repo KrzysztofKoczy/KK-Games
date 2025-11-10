@@ -18,6 +18,7 @@ import {
   IonToast
 } from '@ionic/angular/standalone';
 import { SocketService } from '../../../core/socket/socket.service';
+import { GuestAuthService } from '../../../core/auth/guest-auth.service';
 
 interface Player {
   token: string;
@@ -55,24 +56,38 @@ export class PictionaryGame implements OnInit, OnDestroy {
   readonly showToast = signal(false);
   readonly toastMessage = signal('');
   readonly currentPlayerToken = signal<string>('');
+  readonly creatorToken = signal<string>('');
+  readonly isCreator = signal<boolean>(false);
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private socketService: SocketService
+    private socketService: SocketService,
+    private guestAuth: GuestAuthService
   ) {}
 
   ngOnInit(): void {
     const roomIdFromRoute = this.route.snapshot.paramMap.get('roomId');
     if (roomIdFromRoute) {
       this.roomId.set(roomIdFromRoute);
-      const socketData = this.socketService.getSocketData();
-      this.currentPlayerToken.set(socketData?.guestToken || '');
+      const token = this.guestAuth.getGuestToken();
+      this.currentPlayerToken.set(token || '');
 
       this.socketService.on('player-joined', (data) => {
         this.players.set(data.players || []);
+        if (data.creator) {
+          this.creatorToken.set(data.creator);
+          this.isCreator.set(data.creator === this.currentPlayerToken());
+        }
         this.toastMessage.set(`👥 ${data.player.name} dołączył do gry!`);
         this.showToast.set(true);
+      });
+
+      this.socketService.on('game-created', (data) => {
+        if (data.creator) {
+          this.creatorToken.set(data.creator);
+          this.isCreator.set(data.creator === this.currentPlayerToken());
+        }
       });
 
       this.socketService.on('player-left', (data) => {
@@ -82,7 +97,7 @@ export class PictionaryGame implements OnInit, OnDestroy {
       });
 
       this.socketService.on('game-update', (data) => {
-        console.log('Game update:', data);
+        // Obsługa aktualizacji gry (do implementacji)
       });
     }
   }
@@ -91,6 +106,7 @@ export class PictionaryGame implements OnInit, OnDestroy {
     this.socketService.off('player-joined');
     this.socketService.off('player-left');
     this.socketService.off('game-update');
+    this.socketService.off('game-created');
   }
 
   leaveGame(): void {

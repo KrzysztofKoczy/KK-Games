@@ -1,6 +1,5 @@
 import { Component } from '@angular/core';
 import { GameLobby } from '../../../shared/components/game-lobby/game-lobby';
-import { AVAILABLE_GAMES } from '../../../shared/constants/game-types';
 
 @Component({
   selector: 'app-pictionary-lobby',
@@ -8,12 +7,9 @@ import { AVAILABLE_GAMES } from '../../../shared/constants/game-types';
   imports: [GameLobby],
   template: `
     <app-game-lobby
-      [defaultGame]="'pictionary'"
-      [availableGames]="availableGames"
-      [gameRoutePrefix]="'/pictionary'"
+      [gameType]="'pictionary'"
     ></app-game-lobby>
   `
 })
 export class PictionaryLobby {
-  availableGames = AVAILABLE_GAMES;
 }

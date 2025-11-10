@@ -3,11 +3,6 @@ import { io, Socket } from 'socket.io-client';
 import { GuestAuthService } from '../auth/guest-auth.service';
 import { environment } from '../../../environments/environment';
 
-export interface SocketEvent {
-  type: string;
-  data: any;
-}
-
 @Injectable({
   providedIn: 'root'
 })
@@ -91,7 +86,10 @@ export class SocketService {
   private joinAsGuest(token: string): void {
     if (!this.socket?.connected) return;
 
-    this.socket.emit('join-as-guest', { token });
+    const user = this.guestAuth.getCurrentUser();
+    const name = user?.name || `Gracz ${token.substring(0, 8)}`;
+
+    this.socket.emit('join-as-guest', { token, name });
   }
 
   /**
@@ -189,13 +187,4 @@ export class SocketService {
   getSocket(): Socket | null {
     return this.socket;
   }
-
-  /**
-   * Pobierz dane z socket (dla debugowania)
-   /**
-    * Pobierz dane z socket (dla debugowania)
-    */
-   getSocketData(): any {
-     return this.socket ? { ...this.socket } : null;
-   }
 }

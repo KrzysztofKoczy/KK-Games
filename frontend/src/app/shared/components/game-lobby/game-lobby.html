@@ -8,28 +8,6 @@
   <div class="container">
     <ion-card>
       <ion-card-header>
-        <ion-card-title>Wybierz grę</ion-card-title>
-      </ion-card-header>
-      <ion-card-content>
-        <ion-item>
-          <ion-label position="stacked">Gra</ion-label>
-          <ion-select
-            [(ngModel)]="selectedGame"
-            (ionChange)="onGameChange()"
-            interface="popover"
-          >
-            @for (game of availableGames; track game.value) {
-              <ion-select-option [value]="game.value">
-                {{ game.label }}
-              </ion-select-option>
-            }
-          </ion-select>
-        </ion-item>
-      </ion-card-content>
-    </ion-card>
-
-    <ion-card>
-      <ion-card-header>
         <ion-card-title>Utwórz nową grę</ion-card-title>
       </ion-card-header>
       <ion-card-content>
@@ -43,21 +21,35 @@
 
     <ion-card>
       <ion-card-header>
-        <ion-card-title>Dołącz do gry</ion-card-title>
+        <ion-card-title>Otwarte lobby</ion-card-title>
       </ion-card-header>
       <ion-card-content>
-        <ion-item>
-          <ion-label position="stacked">Kod gry</ion-label>
-          <ion-input
-            [(ngModel)]="roomCode"
-            placeholder="Wprowadź kod gry"
-            (keyup.enter)="joinGame()"
-          ></ion-input>
-        </ion-item>
-        <ion-button expand="block" (click)="joinGame()" [disabled]="!roomCode">
-          <ion-icon name="enter-outline" slot="start"></ion-icon>
-          Dołącz
-        </ion-button>
+        @if (openLobbies().length === 0) {
+          <p>Brak otwartych lobby. Utwórz nową grę!</p>
+        } @else {
+          <ion-list>
+            @for (lobby of openLobbies(); track lobby.roomId) {
+              <ion-item>
+                <ion-label>
+                  <h2>Kod: {{ lobby.roomId }}</h2>
+                  <p>Gracze: {{ lobby.currentPlayers }}/{{ lobby.maxPlayers }}</p>
+                </ion-label>
+                <ion-badge slot="end" color="primary">
+                  {{ lobby.currentPlayers }}/{{ lobby.maxPlayers }}
+                </ion-badge>
+                <ion-button 
+                  slot="end" 
+                  fill="outline" 
+                  size="small"
+                  (click)="joinLobby(lobby.roomId)"
+                >
+                  <ion-icon name="enter-outline" slot="start"></ion-icon>
+                  Dołącz
+                </ion-button>
+              </ion-item>
+            }
+          </ion-list>
+        }
       </ion-card-content>
     </ion-card>
   </div>

@@ -1,7 +1,17 @@
 <ion-app>
   <ion-header>
     <ion-toolbar>
+      @if (canGoBack()) {
+        <ion-button slot="start" fill="clear" (click)="goBack()">
+          <ion-icon name="arrow-back-outline" slot="icon-only"></ion-icon>
+        </ion-button>
+      }
       <ion-title>KK - Games</ion-title>
+      @if (showLogout()) {
+        <ion-button slot="end" fill="clear" (click)="logout()">
+          <ion-icon name="log-out-outline" slot="icon-only"></ion-icon>
+        </ion-button>
+      }
       <ion-toggle slot="end" name="dark-mode" [checked]="darkMode()" (ionChange)="toggleDarkMode()" />
     </ion-toolbar>
   </ion-header>

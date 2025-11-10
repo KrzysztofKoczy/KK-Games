@@ -21,7 +21,7 @@
                 @if (player.token === currentPlayerToken()) {
                   <span class="you-badge">(Ty)</span>
                 }
-                @if (isGameMaster() && player.token === players()[0]?.token) {
+                @if (isGameMaster() && player.token === creatorToken()) {
                   <span class="master-badge">👑 Mistrz</span>
                 }
               </ion-label>
@@ -50,37 +50,42 @@
         <ion-card-header>
           <ion-card-title>Konfiguracja gry</ion-card-title>
         </ion-card-header>
-        @if (isGameMaster()) {
-          <ion-card-content>
-            <p>Uczestnicy (bez Ciebie): {{ participants().length }}</p>
-            <ion-item>
-              <ion-label>Liczba szpiegów:</ion-label>
-              <ion-select [value]="spyCount()" (ionChange)="spyCount.set($any($event).detail.value)">
-                @for (count of spyCountOptions(); track count) {
-                  <ion-select-option [value]="count">
-                    {{ count }}
-                  </ion-select-option>
-                }
-              </ion-select>
-            </ion-item>
-            <ion-button expand="block" (click)="configureSpyCount()" [disabled]="participants().length < 4">
-              Zapisz konfigurację
-            </ion-button>
-            <ion-button 
-              expand="block" 
-              color="success" 
-              (click)="startGame()" 
-              [disabled]="players().length < 5 || !spyCount() || gamePhase() !== 'configuring'"
-              class="start-button"
+        <ion-card-content>
+          <p>Uczestnicy (bez Ciebie): {{ participants().length }}</p>
+          <ion-item>
+            <ion-label>Liczba szpiegów:</ion-label>
+            <ion-select 
+              [value]="spyCount()" 
+              (ionChange)="spyCount.set($any($event).detail.value)"
+              [disabled]="!isGameMaster()"
             >
-              🎮 Start gry
-            </ion-button>
-          </ion-card-content>
-        } @else {
-          <ion-card-content>
-            <p>Oczekiwanie na konfigurację przez mistrza gry...</p>
-          </ion-card-content>
-        }
+              @for (count of spyCountOptions(); track count) {
+                <ion-select-option [value]="count">
+                  {{ count }}
+                </ion-select-option>
+              }
+            </ion-select>
+          </ion-item>
+          <ion-button 
+            expand="block" 
+            (click)="configureSpyCount()" 
+            [disabled]="participants().length < 4 || !isGameMaster()"
+          >
+            Zapisz konfigurację
+          </ion-button>
+          <ion-button 
+            expand="block" 
+            color="success" 
+            (click)="startGame()" 
+            [disabled]="players().length < 5 || !spyCount() || gamePhase() !== 'configuring' || !isGameMaster()"
+            class="start-button"
+          >
+            🎮 Start gry
+          </ion-button>
+          @if (!isGameMaster()) {
+            <p class="info-text">Tylko założyciel gry może konfigurować i startować</p>
+          }
+        </ion-card-content>
       </ion-card>
     }
 

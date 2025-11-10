@@ -11,19 +11,42 @@ export interface GuestUser {
 })
 export class GuestAuthService {
   private readonly STORAGE_KEY = 'guestToken';
+  private readonly STORAGE_NAME_KEY = 'guestName';
   
   // Angular Signal dla stanu użytkownika
   readonly currentUser = signal<GuestUser | null>(null);
   readonly isAuthenticated = signal<boolean>(false);
 
   constructor() {
-    this.initializeGuest();
+    this.checkExistingSession();
   }
 
   /**
-   * Inicjalizacja Guest Mode - sprawdza localStorage lub tworzy nowy token
+   * Sprawdza czy istnieje już sesja w localStorage
    */
-  private initializeGuest(): void {
+  private checkExistingSession(): void {
+    const token = localStorage.getItem(this.STORAGE_KEY);
+    const name = localStorage.getItem(this.STORAGE_NAME_KEY);
+
+    if (token && name) {
+      // Użytkownik był już zalogowany
+      const guestUser: GuestUser = {
+        token,
+        name
+      };
+      this.currentUser.set(guestUser);
+      this.isAuthenticated.set(true);
+    }
+  }
+
+  /**
+   * Logowanie jako gość z nazwą użytkownika
+   */
+  loginAsGuest(name: string): void {
+    if (!name || name.trim().length < 3 || name.trim().length > 256) {
+      throw new Error('Nazwa użytkownika musi mieć między 3 a 256 znaków');
+    }
+
     let token = localStorage.getItem(this.STORAGE_KEY);
 
     if (!token) {
@@ -32,9 +55,12 @@ export class GuestAuthService {
       localStorage.setItem(this.STORAGE_KEY, token);
     }
 
+    // Zapisz nazwę użytkownika
+    localStorage.setItem(this.STORAGE_NAME_KEY, name.trim());
+
     const guestUser: GuestUser = {
       token,
-      name: `Gracz ${token.substring(0, 8)}`
+      name: name.trim()
     };
 
     this.currentUser.set(guestUser);
@@ -57,29 +83,13 @@ export class GuestAuthService {
   }
 
   /**
-   * Zmień nazwę gracza (opcjonalnie)
-   */
-  updatePlayerName(name: string): void {
-    const current = this.currentUser();
-    if (current) {
-      const updated: GuestUser = {
-        ...current,
-        name: name || current.name
-      };
-      this.currentUser.set(updated);
-    }
-  }
-
-  /**
-   * Wyloguj (usuń token)
+   * Wyloguj (usuń token i nazwę)
    */
   logout(): void {
     localStorage.removeItem(this.STORAGE_KEY);
+    localStorage.removeItem(this.STORAGE_NAME_KEY);
     this.currentUser.set(null);
     this.isAuthenticated.set(false);
-    
-    // Generuj nowy token dla następnej sesji
-    this.initializeGuest();
   }
 }
 

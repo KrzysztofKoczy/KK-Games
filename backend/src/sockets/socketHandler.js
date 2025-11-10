@@ -36,7 +36,7 @@ export function setupSocketIO(io) {
 
     // Guest Mode - Dołączanie z tokenem
     socket.on('join-as-guest', async (data) => {
-      const { token } = data;
+      const { token, name } = data;
       
       if (!token) {
         socket.emit('error', { message: 'Token wymagany' });
@@ -45,7 +45,8 @@ export function setupSocketIO(io) {
 
       // Zapisz token w sesji socket
       socket.data.guestToken = token;
-      socket.data.playerName = `Gracz ${token.substring(0, 8)}`;
+      // Użyj nazwy z frontendu lub wygeneruj domyślną
+      socket.data.playerName = name || `Gracz ${token.substring(0, 8)}`;
 
       socket.emit('guest-joined', {
         token,
@@ -53,7 +54,39 @@ export function setupSocketIO(io) {
         message: 'Połączono jako gość'
       });
 
-      console.log(`🎮 Guest joined: ${token.substring(0, 8)}...`);
+      console.log(`🎮 Guest joined: ${socket.data.playerName} (${token.substring(0, 8)}...)`);
+    });
+
+    // Pobieranie listy otwartych lobby dla danego typu gry
+    socket.on('get-open-lobbies', async (data) => {
+      const { gameType } = data;
+      
+      if (!gameType) {
+        socket.emit('error', { message: 'Typ gry wymagany' });
+        return;
+      }
+
+      // Filtruj otwarte lobby (status: waiting lub configuring) dla danego typu gry
+      const openLobbies = Array.from(activeGameRooms.values())
+        .filter(room => 
+          room.gameType === gameType && 
+          (room.gameState.status === 'waiting' || room.gameState.status === 'configuring') &&
+          room.players.length < room.maxPlayers
+        )
+        .map(room => ({
+          roomId: room.roomId,
+          gameType: room.gameType,
+          currentPlayers: room.players.length,
+          maxPlayers: room.maxPlayers,
+          status: room.gameState.status,
+          createdAt: room.createdAt
+        }))
+        .sort((a, b) => b.createdAt - a.createdAt); // Najnowsze na górze
+
+      socket.emit('open-lobbies-list', {
+        gameType,
+        lobbies: openLobbies
+      });
     });
 
     // Tworzenie nowej gry
@@ -88,6 +121,8 @@ export function setupSocketIO(io) {
         gameState: {
           status: 'waiting', // waiting, configuring, playing, finished
           currentRound: 0,
+          // Założyciel lobby (pierwszy gracz) - dla wszystkich gier
+          creator: guestToken,
           // Dla gry Spy
           ...(gameType === 'spy' && {
             gameMaster: guestToken,
@@ -109,8 +144,12 @@ export function setupSocketIO(io) {
       socket.emit('game-created', {
         roomId,
         gameType,
+        creator: guestToken,
         maxPlayers: gameRoom.maxPlayers
       });
+
+      // Broadcast aktualizacji listy lobby dla wszystkich zainteresowanych tym typem gry
+      io.emit('lobby-updated', { gameType });
 
       console.log(`🎮 Game created: ${roomId} by ${guestToken.substring(0, 8)}...`);
     });
@@ -164,6 +203,8 @@ export function setupSocketIO(io) {
       // Powiadom wszystkich w room (włącznie z nowym graczem)
       io.to(roomId).emit('player-joined', {
         roomId,
+        gameType: gameRoom.gameType,
+        creator: gameRoom.gameState.creator,
         player: {
           token: guestToken,
           name: socket.data.playerName
@@ -175,6 +216,9 @@ export function setupSocketIO(io) {
         totalPlayers: gameRoom.players.length,
         maxPlayers: gameRoom.maxPlayers
       });
+
+      // Broadcast aktualizacji listy lobby
+      io.emit('lobby-updated', { gameType: gameRoom.gameType });
 
       console.log(`👥 Player joined: ${roomId} - ${guestToken.substring(0, 8)}...`);
     });
@@ -189,9 +233,9 @@ export function setupSocketIO(io) {
 
       const guestToken = socket.data.guestToken;
 
-      // Dla gry Spy - mistrz nie może opuścić gry
-      if (gameRoom.gameType === 'spy' && gameRoom.gameState?.gameMaster === guestToken) {
-        socket.emit('error', { message: 'Mistrz gry nie może opuścić gry' });
+      // Dla gry Spy - założyciel nie może opuścić gry
+      if (gameRoom.gameType === 'spy' && gameRoom.gameState?.creator === guestToken) {
+        socket.emit('error', { message: 'Założyciel gry nie może opuścić gry' });
         return;
       }
 
@@ -204,6 +248,7 @@ export function setupSocketIO(io) {
       socket.data.currentRoom = null;
 
       // Powiadom pozostałych graczy
+      const gameType = gameRoom.gameType;
       if (gameRoom.players.length > 0) {
         io.to(roomId).emit('player-left', {
           roomId,
@@ -213,9 +258,13 @@ export function setupSocketIO(io) {
           })),
           totalPlayers: gameRoom.players.length
         });
+        // Broadcast aktualizacji listy lobby
+        io.emit('lobby-updated', { gameType });
       } else {
         // Jeśli nikt nie został, usuń room
         activeGameRooms.delete(roomId);
+        // Broadcast aktualizacji listy lobby
+        io.emit('lobby-updated', { gameType });
       }
 
       console.log(`👋 Player left: ${roomId}`);
@@ -265,9 +314,9 @@ export function setupSocketIO(io) {
         return;
       }
 
-      // Sprawdź czy to mistrz gry
-      if (gameRoom.gameState.gameMaster !== guestToken) {
-        socket.emit('error', { message: 'Tylko mistrz gry może konfigurować' });
+      // Sprawdź czy to założyciel (mistrz gry)
+      if (gameRoom.gameState.creator !== guestToken) {
+        socket.emit('error', { message: 'Tylko założyciel gry może konfigurować' });
         return;
       }
 
@@ -316,9 +365,9 @@ export function setupSocketIO(io) {
         return;
       }
 
-      // Sprawdź czy to mistrz gry
-      if (gameRoom.gameState.gameMaster !== guestToken) {
-        socket.emit('error', { message: 'Tylko mistrz gry może rozpocząć grę' });
+      // Sprawdź czy to założyciel (mistrz gry)
+      if (gameRoom.gameState.creator !== guestToken) {
+        socket.emit('error', { message: 'Tylko założyciel gry może rozpocząć grę' });
         return;
       }
 
@@ -396,9 +445,9 @@ export function setupSocketIO(io) {
         return;
       }
 
-      // Sprawdź czy to mistrz gry
-      if (gameRoom.gameState.gameMaster !== guestToken) {
-        socket.emit('error', { message: 'Tylko mistrz gry może zakończyć grę' });
+      // Sprawdź czy to założyciel (mistrz gry)
+      if (gameRoom.gameState.creator !== guestToken) {
+        socket.emit('error', { message: 'Tylko założyciel gry może zakończyć grę' });
         return;
       }
 
@@ -431,9 +480,9 @@ export function setupSocketIO(io) {
         return;
       }
 
-      // Sprawdź czy to mistrz gry
-      if (gameRoom.gameState.gameMaster !== guestToken) {
-        socket.emit('error', { message: 'Tylko mistrz gry może rozpocząć nową grę' });
+      // Sprawdź czy to założyciel (mistrz gry)
+      if (gameRoom.gameState.creator !== guestToken) {
+        socket.emit('error', { message: 'Tylko założyciel gry może rozpocząć nową grę' });
         return;
       }
 

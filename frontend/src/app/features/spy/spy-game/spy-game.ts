@@ -1,6 +1,5 @@
 import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   IonContent,
@@ -15,14 +14,12 @@ import {
   IonList,
   IonItem,
   IonLabel,
-  IonBadge,
   IonToast,
   IonSelect,
   IonSelectOption
 } from '@ionic/angular/standalone';
 import { SocketService } from '../../../core/socket/socket.service';
 import { GuestAuthService } from '../../../core/auth/guest-auth.service';
-import { environment } from '../../../../environments/environment';
 
 interface Player {
   token: string;
@@ -37,7 +34,6 @@ type PlayerCard = 'spy' | 'location' | null;
   standalone: true,
   imports: [
     CommonModule,
-    FormsModule,
     IonContent,
     IonHeader,
     IonTitle,
@@ -46,11 +42,10 @@ type PlayerCard = 'spy' | 'location' | null;
     IonCard,
     IonCardHeader,
     IonCardTitle,
-  IonCardContent,
+    IonCardContent,
     IonList,
     IonItem,
     IonLabel,
-    IonBadge,
     IonToast,
     IonSelect,
     IonSelectOption
@@ -62,6 +57,7 @@ export class SpyGame implements OnInit, OnDestroy {
   readonly roomId = signal<string>('');
   readonly players = signal<Player[]>([]);
   readonly currentPlayerToken = signal<string>('');
+  readonly creatorToken = signal<string>('');
   readonly isGameMaster = signal<boolean>(false);
   readonly gamePhase = signal<GamePhase>('waiting');
   readonly spyCount = signal<number>(1);
@@ -106,6 +102,16 @@ export class SpyGame implements OnInit, OnDestroy {
         this.updateParticipants();
       }, 100);
     }
+
+    // Handler dla utworzenia gry - zapisz creator
+    const gameCreatedHandler = (data: any) => {
+      if (data.creator) {
+        this.creatorToken.set(data.creator);
+      }
+      this.updateGameMasterStatus();
+    };
+    this.socketService.on('game-created', gameCreatedHandler);
+    this.handlers.set('game-created', gameCreatedHandler);
   }
 
   ngOnDestroy(): void {
@@ -120,15 +126,13 @@ export class SpyGame implements OnInit, OnDestroy {
     // Handler dla dołączenia gracza
     const playerJoinedHandler = (data: any) => {
       this.players.set(data.players || []);
+      if (data.creator) {
+        this.creatorToken.set(data.creator);
+      }
       this.updateGameMasterStatus();
       this.updateParticipants();
       this.toastMessage.set(`👥 ${data.player.name} dołączył do gry!`);
       this.showToast.set(true);
-      
-      // Jeśli to pierwszy gracz (twórca), ustaw jako mistrza
-      if (data.players && data.players.length === 1) {
-        this.isGameMaster.set(data.players[0].token === this.currentPlayerToken());
-      }
     };
     this.socketService.on('player-joined', playerJoinedHandler);
     this.handlers.set('player-joined', playerJoinedHandler);
@@ -202,14 +206,20 @@ export class SpyGame implements OnInit, OnDestroy {
   }
 
   private updateGameMasterStatus(): void {
-    // Sprawdzamy czy pierwszy gracz (twórca) to obecny użytkownik
-    // W grze Spy pierwszy gracz (twórca) to mistrz gry
-    const allPlayers = this.players();
-    if (allPlayers.length > 0) {
-      const firstPlayer = allPlayers[0];
-      this.isGameMaster.set(firstPlayer?.token === this.currentPlayerToken());
+    // Sprawdzamy czy założyciel (creator) to obecny użytkownik
+    // W grze Spy założyciel to mistrz gry
+    const creator = this.creatorToken();
+    if (creator) {
+      this.isGameMaster.set(creator === this.currentPlayerToken());
     } else {
-      this.isGameMaster.set(false);
+      // Fallback: sprawdź pierwszego gracza jeśli creator nie jest jeszcze ustawiony
+      const allPlayers = this.players();
+      if (allPlayers.length > 0) {
+        const firstPlayer = allPlayers[0];
+        this.isGameMaster.set(firstPlayer?.token === this.currentPlayerToken());
+      } else {
+        this.isGameMaster.set(false);
+      }
     }
   }
 

@@ -20,11 +20,29 @@
 
         <p>Funkcja logowania będzie dostępna wkrótce.</p>
         <p>Na razie możesz korzystać z trybu gościa.</p>
-        <ion-button expand="block" (click)="navigateToHome()">
+        
+        <!-- Input na nazwę gościa -->
+        <ion-item>
+          <ion-label position="stacked">Nazwa użytkownika</ion-label>
+          <ion-input
+            [value]="guestName()"
+            (ionInput)="onGuestNameChange($event)"
+            placeholder="Wpisz swoją nazwę (3-256 znaków)"
+            maxlength="256"
+            [class.ion-invalid]="guestNameError()"
+          ></ion-input>
+        </ion-item>
+        
+        @if (guestNameError()) {
+          <ion-text color="danger">
+            <p class="error-text">{{ guestNameError() }}</p>
+          </ion-text>
+        }
+        
+        <ion-button expand="block" (click)="loginAsGuest()">
           Zaloguj jako gość
         </ion-button>
       </ion-card-content>
     </ion-card>
   </div>
 </ion-content>
-
