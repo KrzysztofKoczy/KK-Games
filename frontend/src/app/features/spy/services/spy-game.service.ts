@@ -2,6 +2,7 @@ import { Injectable, signal, inject } from '@angular/core';
 import { SocketService } from '../../../core/socket/socket.service';
 import { GuestAuthService } from '../../../core/auth/guest-auth.service';
 import { ToastService } from '../../../shared/services/toast.service';
+import { BaseSocketHandlerService } from '../../../shared/services/base-socket-handler.service';
 import {
   Player,
   PlayerJoinedEvent,
@@ -18,8 +19,7 @@ export type GamePhase = 'waiting' | 'configuring' | 'playing' | 'finished';
 export type PlayerCard = 'spy' | 'location' | null;
 
 @Injectable()
-export class SpyGameService {
-  private readonly socketService = inject(SocketService);
+export class SpyGameService extends BaseSocketHandlerService {
   private readonly guestAuth = inject(GuestAuthService);
   private readonly toastService = inject(ToastService);
 
@@ -38,7 +38,6 @@ export class SpyGameService {
   readonly isEnding = signal<boolean>(false);
   readonly isResetting = signal<boolean>(false);
 
-  private unsubscribeFunctions: (() => void)[] = [];
   private roomId: string = '';
 
   /**
@@ -59,52 +58,42 @@ export class SpyGameService {
   }
 
   /**
-   * Czyści wszystkie listenery
-   */
-  cleanup(): void {
-    this.unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
-    this.unsubscribeFunctions = [];
-  }
-
-  /**
    * Konfiguruje handlery socketów
    */
   private setupSocketHandlers(): void {
-    const gameCreatedHandler = (data: GameCreatedEvent) => {
+    this.registerListener('game-created', (data: GameCreatedEvent) => {
       if (data.creator) {
         this.creatorToken.set(data.creator);
       }
-
       this.updateGameMasterStatus();
-    };
+    });
 
-    const playerJoinedHandler = (data: PlayerJoinedEvent) => {
+    this.registerListener('player-joined', (data: PlayerJoinedEvent) => {
       if (data.creator) {
         this.creatorToken.set(data.creator);
       }
-
       this.players.set(data.players || []);
       this.updateGameMasterStatus();
       this.updateParticipants();
       this.toastService.info(`${data.player.name} dołączył do gry!`);
-    };
+    });
 
-    const playerLeftHandler = (data: PlayerLeftEvent) => {
+    this.registerListener('player-left', (data: PlayerLeftEvent) => {
       this.players.set(data.players || []);
       this.updateGameMasterStatus();
       this.updateParticipants();
       this.toastService.warning('Gracz opuścił grę');
-    };
+    });
 
-    const spyConfiguredHandler = (data: SpyConfiguredEvent) => {
+    this.registerListener('spy-configured', (data: SpyConfiguredEvent) => {
       this.isConfiguring.set(false);
       this.spyCount.set(data.spyCount);
       this.participants.set(data.participants || []);
       this.gamePhase.set('configuring');
       this.toastService.success(`Konfiguracja zapisana: ${data.spyCount} szpiegów`);
-    };
+    });
 
-    const spyGameStartedHandler = (data: SpyGameStartedEvent) => {
+    this.registerListener('spy-game-started', (data: SpyGameStartedEvent) => {
       this.isStarting.set(false);
       this.playerCard.set(data.playerCard);
       this.location.set(data.location);
@@ -112,15 +101,15 @@ export class SpyGameService {
       this.gamePhase.set('playing');
       this.cardFlipped.set(false);
       this.toastService.success('Gra rozpoczęta!');
-    };
+    });
 
-    const spyGameEndedHandler = (data: SpyGameEndedEvent) => {
+    this.registerListener('spy-game-ended', (data: SpyGameEndedEvent) => {
       this.isEnding.set(false);
       this.gamePhase.set('finished');
       this.toastService.info('Gra zakończona!');
-    };
+    });
 
-    const spyGameResetHandler = (data: SpyGameResetEvent) => {
+    this.registerListener('spy-game-reset', (data: SpyGameResetEvent) => {
       this.isResetting.set(false);
       this.players.set(data.players || []);
       this.updateGameMasterStatus();
@@ -130,26 +119,15 @@ export class SpyGameService {
       this.location.set(null);
       this.cardFlipped.set(false);
       this.toastService.success('Nowa gra przygotowana!');
-    };
+    });
 
-    const errorHandler = (error: ErrorEvent) => {
+    this.registerListener('error', (error: ErrorEvent) => {
       this.isConfiguring.set(false);
       this.isStarting.set(false);
       this.isEnding.set(false);
       this.isResetting.set(false);
       this.toastService.error(error.message || 'Wystąpił błąd');
-    };
-
-    this.unsubscribeFunctions.push(
-      this.socketService.on('game-created', gameCreatedHandler),
-      this.socketService.on('player-joined', playerJoinedHandler),
-      this.socketService.on('player-left', playerLeftHandler),
-      this.socketService.on('spy-configured', spyConfiguredHandler),
-      this.socketService.on('spy-game-started', spyGameStartedHandler),
-      this.socketService.on('spy-game-ended', spyGameEndedHandler),
-      this.socketService.on('spy-game-reset', spyGameResetHandler),
-      this.socketService.on('error', errorHandler)
-    );
+    });
   }
 
   private updateGameMasterStatus(): void {

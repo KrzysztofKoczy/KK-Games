@@ -2,6 +2,7 @@ import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { SocketService } from '../../core/socket/socket.service';
 import { ToastService } from './toast.service';
+import { BaseSocketHandlerService } from './base-socket-handler.service';
 import { extractGameTypeFromRoomId } from '../utils/game-utils';
 import {
   GameCreatedEvent,
@@ -15,20 +16,15 @@ import {
 @Injectable({
   providedIn: 'root'
 })
-export class GameLobbyService {
-  private readonly socketService = inject(SocketService);
+export class GameLobbyService extends BaseSocketHandlerService {
   private readonly router = inject(Router);
   private readonly toastService = inject(ToastService);
 
   readonly openLobbies = signal<OpenLobby[]>([]);
   readonly isLoadingLobbies = signal<boolean>(false);
 
-  private unsubscribeFunctions: (() => void)[] = [];
   private gameType: string = '';
 
-  /**
-   * Inicjalizuje serwis dla danego typu gry
-   */
   initialize(gameType: string): void {
     this.gameType = gameType;
     this.setupSocketHandlers();
@@ -36,63 +32,45 @@ export class GameLobbyService {
   }
 
   /**
-   * Czyści wszystkie listenery
-   */
-  cleanup(): void {
-    this.unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
-    this.unsubscribeFunctions = [];
-  }
-
-  /**
    * Konfiguruje handlery socketów
    */
   private setupSocketHandlers(): void {
-    const gameCreatedHandler = (data: GameCreatedEvent) => {
+    this.registerListener('game-created', (data: GameCreatedEvent) => {
       this.socketService.isCreatingGame.set(false);
       this.toastService.success(`Gra utworzona! Kod: ${data.roomId}`);
       const detectedGameType = data.gameType || extractGameTypeFromRoomId(data.roomId) || this.gameType;
       setTimeout(() => {
         this.navigateToGame(data.roomId, detectedGameType);
       }, 1000);
-    };
+    });
 
-    const playerJoinedHandler = (data: PlayerJoinedEvent) => {
+    this.registerListener('player-joined', (data: PlayerJoinedEvent) => {
       this.socketService.isJoiningGame.set(false);
       this.toastService.success('Dołączono do gry!');
       const detectedGameType = data.gameType || extractGameTypeFromRoomId(data.roomId) || this.gameType;
       setTimeout(() => {
         this.navigateToGame(data.roomId, detectedGameType);
       }, 1000);
-    };
+    });
 
-    const errorHandler = (error: ErrorEvent) => {
+    this.registerListener('error', (error: ErrorEvent) => {
       this.socketService.isCreatingGame.set(false);
       this.socketService.isJoiningGame.set(false);
       this.toastService.error(error.message || 'Wystąpił błąd');
-    };
+    });
 
-    const openLobbiesHandler = (data: OpenLobbiesListEvent) => {
+    this.registerListener('open-lobbies-list', (data: OpenLobbiesListEvent) => {
       if (data.gameType === this.gameType) {
         this.openLobbies.set(data.lobbies || []);
         this.isLoadingLobbies.set(false);
       }
-    };
+    });
 
-    const lobbyUpdatedHandler = (data: LobbyUpdatedEvent) => {
+    this.registerListener('lobby-updated', (data: LobbyUpdatedEvent) => {
       if (data.gameType === this.gameType) {
-        // Odśwież listę lobby
         this.loadOpenLobbies();
       }
-    };
-
-    // Rejestruj handlery
-    this.unsubscribeFunctions.push(
-      this.socketService.on('game-created', gameCreatedHandler),
-      this.socketService.on('player-joined', playerJoinedHandler),
-      this.socketService.on('error', errorHandler),
-      this.socketService.on('open-lobbies-list', openLobbiesHandler),
-      this.socketService.on('lobby-updated', lobbyUpdatedHandler)
-    );
+    });
   }
 
   /**
