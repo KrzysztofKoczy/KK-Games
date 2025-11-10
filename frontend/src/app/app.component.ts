@@ -1,28 +1,33 @@
-import { Component, signal, OnInit, effect, inject, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, computed } from '@angular/core';
 import { Location } from '@angular/common';
 import { Router, NavigationEnd } from '@angular/router';
-import { filter } from 'rxjs/operators';
+import { filter, Subscription } from 'rxjs';
 import { IonApp, IonHeader, IonRouterOutlet, IonTitle, IonToggle, IonToolbar, IonButton, IonIcon } from '@ionic/angular/standalone';
 import { arrowBackOutline, logOutOutline } from 'ionicons/icons';
 import { addIcons } from 'ionicons';
 import { GuestAuthService } from './core/auth/guest-auth.service';
 import { SocketService } from './core/socket/socket.service';
+import { ThemeService } from './core/theme/theme.service';
+import { ToastContainer } from './shared/components/toast-container/toast-container';
 
 @Component({
   selector: 'app-root',
-  imports: [IonApp, IonRouterOutlet, IonToggle, IonToolbar, IonTitle, IonHeader, IonButton, IonIcon],
+  imports: [IonApp, IonRouterOutlet, IonToggle, IonToolbar, IonTitle, IonHeader, IonButton, IonIcon, ToastContainer],
   templateUrl: './app.html',
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   private location = inject(Location);
   private router = inject(Router);
   private guestAuth = inject(GuestAuthService);
   private socketService = inject(SocketService);
+  private themeService = inject(ThemeService);
   
-  darkMode = signal(false);
+  private routerSubscription?: Subscription;
+  
   title = 'Games App';
-  canGoBack = signal(false);
-  currentUrl = signal<string>('');
+  canGoBack = this.themeService.canGoBack;
+  currentUrl = this.themeService.currentUrl;
+  darkMode = this.themeService.darkMode;
   
   readonly isAuthenticated = computed(() => this.guestAuth.isAuthenticated());
   readonly showLogout = computed(() => {
@@ -31,18 +36,14 @@ export class AppComponent implements OnInit {
 
   constructor() {
     addIcons({ arrowBackOutline, logOutOutline });
+  }
+
+  ngOnInit() {
+    this.currentUrl.set(this.router.url);
+    this.updateBackButtonVisibility();
     
-    effect(() => {
-      const isDark = this.darkMode();
-      const htmlElement = document.documentElement;
-
-      isDark ? htmlElement.classList.add('ion-palette-dark') : htmlElement.classList.remove('ion-palette-dark');
-
-      localStorage.setItem('darkMode', String(isDark));
-    });
-
-    // Sprawdzaj czy można cofnąć się w historii
-    this.router.events
+    // Subskrypcja router events z właściwym czyszczeniem
+    this.routerSubscription = this.router.events
       .pipe(filter(event => event instanceof NavigationEnd))
       .subscribe(() => {
         this.currentUrl.set(this.router.url);
@@ -50,14 +51,14 @@ export class AppComponent implements OnInit {
       });
   }
 
-  ngOnInit() {
-    this.getModePreference();
-    this.currentUrl.set(this.router.url);
-    this.updateBackButtonVisibility();
+  ngOnDestroy(): void {
+    if (this.routerSubscription) {
+      this.routerSubscription.unsubscribe();
+    }
   }
 
   toggleDarkMode() {
-    this.darkMode.set(!this.darkMode());
+    this.themeService.toggleDarkMode();
   }
 
   goBack(): void {
@@ -65,32 +66,13 @@ export class AppComponent implements OnInit {
   }
 
   logout(): void {
-    // Rozłącz socket
     this.socketService.disconnect();
-    
-    // Wyloguj użytkownika
     this.guestAuth.logout();
-    
-    // Przekieruj do strony logowania
     this.router.navigate(['/login']);
   }
 
   private updateBackButtonVisibility(): void {
-    // Sprawdź czy jest historia do cofnięcia (nie jesteśmy na głównej stronie)
-    const currentUrl = this.router.url;
-    const isLoginPage = currentUrl === '/login';
-    const isHomePage = currentUrl === '/home';
-    
-    // Pokaż przycisk wstecz jeśli nie jesteśmy na login lub home (lub jeśli jest historia)
-    this.canGoBack.set(!isLoginPage && !isHomePage);
-  }
-
-  private getModePreference() {
-    if (localStorage.getItem('darkMode') !== null) {
-      this.darkMode.set(localStorage.getItem('darkMode') === 'true');
-    } else {
-      this.darkMode.set(window.matchMedia('(prefers-color-scheme: dark)').matches);
-    }
+    this.themeService.updateBackButtonVisibility(this.router.url);
   }
 }
 
