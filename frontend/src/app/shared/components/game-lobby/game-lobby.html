@@ -12,9 +12,13 @@
       </ion-card-header>
       <ion-card-content>
         <p>Stwórz nową sesję gry i zaproś znajomych!</p>
-        <ion-button expand="block" (click)="createGame()">
+        <ion-button expand="block" (click)="createGame()" [disabled]="isCreatingGame()">
           <ion-icon name="add-circle-outline" slot="start"></ion-icon>
-          Utwórz grę
+          @if (isCreatingGame()) {
+            Tworzenie...
+          } @else {
+            Utwórz grę
+          }
         </ion-button>
       </ion-card-content>
     </ion-card>
@@ -24,7 +28,9 @@
         <ion-card-title>Otwarte lobby</ion-card-title>
       </ion-card-header>
       <ion-card-content>
-        @if (openLobbies().length === 0) {
+        @if (isLoadingLobbies()) {
+          <p>Ładowanie lobby...</p>
+        } @else if (openLobbies().length === 0) {
           <p>Brak otwartych lobby. Utwórz nową grę!</p>
         } @else {
           <ion-list>
@@ -42,9 +48,14 @@
                   fill="outline" 
                   size="small"
                   (click)="joinLobby(lobby.roomId)"
+                  [disabled]="isJoiningGame()"
                 >
                   <ion-icon name="enter-outline" slot="start"></ion-icon>
-                  Dołącz
+                  @if (isJoiningGame()) {
+                    ...
+                  } @else {
+                    Dołącz
+                  }
                 </ion-button>
               </ion-item>
             }
@@ -54,10 +65,4 @@
     </ion-card>
   </div>
 
-  <ion-toast
-    [isOpen]="showToast()"
-    [message]="toastMessage()"
-    [duration]="3000"
-    (didDismiss)="showToast.set(false)"
-  ></ion-toast>
 </ion-content>
