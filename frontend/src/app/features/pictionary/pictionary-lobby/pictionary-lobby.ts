@@ -6,9 +6,7 @@ import { GameLobby } from '../../../shared/components/game-lobby/game-lobby';
   standalone: true,
   imports: [GameLobby],
   template: `
-    <app-game-lobby
-      [gameType]="'pictionary'"
-    ></app-game-lobby>
+    <app-game-lobby [gameType]="'pictionary'"/>
   `
 })
 export class PictionaryLobby {

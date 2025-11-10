@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -14,16 +14,12 @@ import {
   IonList,
   IonItem,
   IonLabel,
-  IonBadge,
-  IonToast
+  IonBadge
 } from '@ionic/angular/standalone';
 import { SocketService } from '../../../core/socket/socket.service';
 import { GuestAuthService } from '../../../core/auth/guest-auth.service';
-
-interface Player {
-  token: string;
-  name: string;
-}
+import { ToastService } from '../../../shared/services/toast.service';
+import { Player, PlayerJoinedEvent, PlayerLeftEvent, GameCreatedEvent, PictionaryGameUpdateEvent } from '../../../core/socket/socket-events.types';
 
 @Component({
   selector: 'app-pictionary-game',
@@ -42,22 +38,23 @@ interface Player {
     IonList,
     IonItem,
     IonLabel,
-    IonBadge,
-    IonToast
+    IonBadge
   ],
   templateUrl: './pictionary-game.html',
-  styleUrls: ['./pictionary-game.scss']
+  styleUrls: ['./pictionary-game.scss'],
 })
 export class PictionaryGame implements OnInit, OnDestroy {
   readonly roomId = signal<string>('');
   readonly players = signal<Player[]>([]);
   readonly maxPlayers = signal<number>(12);
   readonly gameStatus = signal<string>('waiting');
-  readonly showToast = signal(false);
-  readonly toastMessage = signal('');
   readonly currentPlayerToken = signal<string>('');
   readonly creatorToken = signal<string>('');
   readonly isCreator = signal<boolean>(false);
+
+  private unsubscribeFunctions: (() => void)[] = [];
+
+  private readonly toastService = inject(ToastService);
 
   constructor(
     private route: ActivatedRoute,
@@ -68,45 +65,60 @@ export class PictionaryGame implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const roomIdFromRoute = this.route.snapshot.paramMap.get('roomId');
-    if (roomIdFromRoute) {
-      this.roomId.set(roomIdFromRoute);
-      const token = this.guestAuth.getGuestToken();
-      this.currentPlayerToken.set(token || '');
-
-      this.socketService.on('player-joined', (data) => {
-        this.players.set(data.players || []);
-        if (data.creator) {
-          this.creatorToken.set(data.creator);
-          this.isCreator.set(data.creator === this.currentPlayerToken());
-        }
-        this.toastMessage.set(`👥 ${data.player.name} dołączył do gry!`);
-        this.showToast.set(true);
-      });
-
-      this.socketService.on('game-created', (data) => {
-        if (data.creator) {
-          this.creatorToken.set(data.creator);
-          this.isCreator.set(data.creator === this.currentPlayerToken());
-        }
-      });
-
-      this.socketService.on('player-left', (data) => {
-        this.players.set(data.players || []);
-        this.toastMessage.set(`👋 Gracz opuścił grę`);
-        this.showToast.set(true);
-      });
-
-      this.socketService.on('game-update', (data) => {
-        // Obsługa aktualizacji gry (do implementacji)
-      });
+    if (!roomIdFromRoute) {
+      this.router.navigate(['/pictionary']);
+      return;
     }
+
+    this.roomId.set(roomIdFromRoute);
+    const token = this.guestAuth.getGuestToken();
+    this.currentPlayerToken.set(token || '');
+
+    // Rejestruj handlery z zapisaniem funkcji do czyszczenia
+    const playerJoinedHandler = (data: PlayerJoinedEvent) => {
+      this.players.set(data.players || []);
+      if (data.creator) {
+        this.creatorToken.set(data.creator);
+        this.isCreator.set(data.creator === this.currentPlayerToken());
+      }
+      this.toastService.info(`${data.player.name} dołączył do gry!`);
+    };
+
+    const gameCreatedHandler = (data: GameCreatedEvent) => {
+      if (data.creator) {
+        this.creatorToken.set(data.creator);
+        this.isCreator.set(data.creator === this.currentPlayerToken());
+      }
+    };
+
+    const playerLeftHandler = (data: PlayerLeftEvent) => {
+      this.players.set(data.players || []);
+      this.toastService.warning('Gracz opuścił grę');
+    };
+
+    const gameUpdateHandler = (data: PictionaryGameUpdateEvent) => {
+      // Obsługa aktualizacji gry (do implementacji)
+      this.gameStatus.set(data.status || 'waiting');
+    };
+
+    // Zapisz funkcje do czyszczenia
+    this.unsubscribeFunctions.push(
+      this.socketService.on('player-joined', playerJoinedHandler),
+      this.socketService.on('game-created', gameCreatedHandler),
+      this.socketService.on('player-left', playerLeftHandler),
+      this.socketService.on('game-update', gameUpdateHandler)
+    );
   }
 
   ngOnDestroy(): void {
-    this.socketService.off('player-joined');
-    this.socketService.off('player-left');
-    this.socketService.off('game-update');
-    this.socketService.off('game-created');
+    // Automatycznie opuść pokój gdy opuszczamy widok gry
+    if (this.roomId()) {
+      this.socketService.leaveGame();
+    }
+    
+    // Wyczyść wszystkie listenery
+    this.unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
+    this.unsubscribeFunctions = [];
   }
 
   leaveGame(): void {
