@@ -13,14 +13,13 @@ import {
   IonCardContent,
   IonIcon
 } from '@ionic/angular/standalone';
-import { addCircleOutline, peopleOutline, playOutline } from 'ionicons/icons';
+import { playOutline } from 'ionicons/icons';
 import { addIcons } from 'ionicons';
 import { GuestAuthService } from '../../core/auth/guest-auth.service';
 import { SocketService } from '../../core/socket/socket.service';
 
 @Component({
   selector: 'app-home-page',
-  standalone: true,
   imports: [
     CommonModule,
     RouterModule,
@@ -36,7 +35,10 @@ import { SocketService } from '../../core/socket/socket.service';
     IonIcon
   ],
   templateUrl: './home-page.html',
-  styleUrls: ['./home-page.scss']
+  styleUrls: ['./home-page.scss'],
+  // host: {
+  //   'class': 'ion-page'
+  // }
 })
 export class HomePage implements OnInit {
   guestAuth = inject(GuestAuthService);
@@ -48,11 +50,10 @@ export class HomePage implements OnInit {
 
   constructor(
   ) {
-    addIcons({ addCircleOutline, peopleOutline, playOutline });
+    addIcons({ playOutline });
   }
 
   ngOnInit(): void {
-    // Upewnij się, że socket jest połączony
     if (!this.socketService.isConnected()) {
       this.socketService.connect();
     }

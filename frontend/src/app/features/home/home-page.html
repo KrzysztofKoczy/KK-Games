@@ -9,9 +9,6 @@
     <div class="welcome-section">
       <h1>Witaj, {{ currentUser()?.name }}!</h1>
       <p>Wybierz grę i zacznij grać</p>
-      <p class="connection-status" [class.connected]="isConnected()">
-        {{ isConnected() ? '✅ Połączono' : '❌ Rozłączono' }}
-      </p>
     </div>
 
     <div class="games-grid">
