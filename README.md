@@ -1,5 +1,8 @@
 # 🎮 Games App - App building 4FUN
 
+## 🛠️ Project - InProgress
+## 🛠️ Demo - InProgress
+
 ## 🚀 Tech Stack
 
 ### Frontend
@@ -14,5 +17,3 @@
 - **Express** - HTTP Server
 - **Socket.io** - WebSocket Server
 - **PostgreSQL** - Database
-
-## 🛠️ Demo - InProgress
