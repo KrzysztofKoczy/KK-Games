@@ -1,4 +1,4 @@
-import { Injectable, signal, effect } from '@angular/core';
+import { Injectable, signal, effect, inject } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { GuestAuthService } from '../auth/guest-auth.service';
 import { environment } from '../../../environments/environment';
@@ -12,6 +12,8 @@ export interface SocketEvent {
   providedIn: 'root'
 })
 export class SocketService {
+  guestAuth = inject(GuestAuthService);
+  
   private socket: Socket | null = null;
   
   // Angular Signals dla stanu połączenia
@@ -19,8 +21,7 @@ export class SocketService {
   readonly currentRoom = signal<string | null>(null);
   readonly connectionError = signal<string | null>(null);
 
-  constructor(private guestAuth: GuestAuthService) {
-    // Auto-connect gdy użytkownik jest zalogowany
+  constructor() {
     effect(() => {
       if (this.guestAuth.isAuthenticated() && !this.socket) {
         this.connect();
@@ -37,6 +38,7 @@ export class SocketService {
     }
 
     const token = this.guestAuth.getGuestToken();
+    
     if (!token) {
       console.error('❌ Brak tokenu gościa - nie można połączyć');
       return;
@@ -148,6 +150,15 @@ export class SocketService {
       action,
       ...data
     });
+  }
+
+  /**
+   * Wyślij event bezpośrednio (dla eventów specyficznych dla gier)
+   */
+  emit(event: string, data: any): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit(event, data);
   }
 
   /**

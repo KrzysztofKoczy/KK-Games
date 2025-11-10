@@ -19,6 +19,10 @@ export const routes: Routes = [
     loadChildren: () => import('./features/pictionary/pictionary.routes').then(m => m.routes)
   },
   {
+    path: 'spy',
+    loadChildren: () => import('./features/spy/spy.routes').then(m => m.routes)
+  },
+  {
     path: '**',
     redirectTo: 'home'
   }

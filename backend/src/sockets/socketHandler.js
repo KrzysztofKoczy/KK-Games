@@ -1,10 +1,34 @@
 import { v4 as uuidv4 } from 'uuid';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 // Przechowywanie aktywnych sesji gier w pamięci (Map)
 // Sesje są przechowywane TYLKO w pamięci - nie zapisujemy do bazy danych
 // W przyszłości można zmienić implementację aby zapisywać sesje do PostgreSQL
 // roomId -> { players: [], gameState: {}, ... }
 const activeGameRooms = new Map();
+
+// Funkcja pomocnicza do losowania miejsca
+function getRandomLocation() {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const locationsPath = join(__dirname, '..', 'data', 'locations.json');
+    const locationsData = JSON.parse(readFileSync(locationsPath, 'utf-8'));
+    const locations = locationsData.locations;
+    return locations[Math.floor(Math.random() * locations.length)];
+  } catch (error) {
+    console.error('Error loading locations:', error);
+    return 'Nieznane miejsce';
+  }
+}
+
+// Funkcja pomocnicza do losowania szpiegów
+function selectRandomSpies(participants, spyCount) {
+  const shuffled = [...participants].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, spyCount).map(p => p.token);
+}
 
 export function setupSocketIO(io) {
   io.on('connection', (socket) => {
@@ -62,9 +86,16 @@ export function setupSocketIO(io) {
           joinedAt: new Date()
         }],
         gameState: {
-          status: 'waiting', // waiting, playing, finished
+          status: 'waiting', // waiting, configuring, playing, finished
           currentRound: 0,
-          // Dodatkowe stany gry będą zależeć od typu gry
+          // Dla gry Spy
+          ...(gameType === 'spy' && {
+            gameMaster: guestToken,
+            spyCount: null,
+            selectedLocation: null,
+            playerCards: new Map(), // token -> 'spy' | 'location'
+            participants: [] // gracze uczestniczący (bez mistrza)
+          })
         },
         createdAt: new Date()
       };
@@ -156,6 +187,14 @@ export function setupSocketIO(io) {
       const gameRoom = activeGameRooms.get(roomId);
       if (!gameRoom) return;
 
+      const guestToken = socket.data.guestToken;
+
+      // Dla gry Spy - mistrz nie może opuścić gry
+      if (gameRoom.gameType === 'spy' && gameRoom.gameState?.gameMaster === guestToken) {
+        socket.emit('error', { message: 'Mistrz gry nie może opuścić gry' });
+        return;
+      }
+
       // Usuń gracza z room
       gameRoom.players = gameRoom.players.filter(
         p => p.socketId !== socket.id
@@ -201,6 +240,220 @@ export function setupSocketIO(io) {
         ...data,
         fromPlayer: socket.data.guestToken
       });
+    });
+
+    // ========== SPY GAME EVENTS ==========
+
+    // Konfiguracja gry Spy - ustawienie liczby szpiegów
+    socket.on('spy-configure', (data) => {
+      const { roomId, spyCount } = data;
+      const guestToken = socket.data.guestToken;
+
+      if (!guestToken) {
+        socket.emit('error', { message: 'Musisz być zalogowany jako gość' });
+        return;
+      }
+
+      const gameRoom = activeGameRooms.get(roomId);
+      if (!gameRoom) {
+        socket.emit('error', { message: 'Gra nie istnieje' });
+        return;
+      }
+
+      if (gameRoom.gameType !== 'spy') {
+        socket.emit('error', { message: 'To nie jest gra Spy' });
+        return;
+      }
+
+      // Sprawdź czy to mistrz gry
+      if (gameRoom.gameState.gameMaster !== guestToken) {
+        socket.emit('error', { message: 'Tylko mistrz gry może konfigurować' });
+        return;
+      }
+
+      // Walidacja liczby szpiegów
+      const participants = gameRoom.players.filter(p => p.token !== guestToken);
+      if (spyCount <= 0 || spyCount >= participants.length) {
+        socket.emit('error', { message: 'Liczba szpiegów musi być większa od 0 i mniejsza od liczby uczestników' });
+        return;
+      }
+
+      // Zapisz konfigurację
+      gameRoom.gameState.spyCount = spyCount;
+      gameRoom.gameState.status = 'configuring';
+
+      // Powiadom wszystkich
+      io.to(roomId).emit('spy-configured', {
+        roomId,
+        spyCount,
+        participants: participants.map(p => ({
+          token: p.token,
+          name: p.name
+        }))
+      });
+
+      console.log(`🕵️ Spy game configured: ${roomId} - ${spyCount} szpiegów`);
+    });
+
+    // Start gry Spy
+    socket.on('spy-start-game', (data) => {
+      const { roomId } = data;
+      const guestToken = socket.data.guestToken;
+
+      if (!guestToken) {
+        socket.emit('error', { message: 'Musisz być zalogowany jako gość' });
+        return;
+      }
+
+      const gameRoom = activeGameRooms.get(roomId);
+      if (!gameRoom) {
+        socket.emit('error', { message: 'Gra nie istnieje' });
+        return;
+      }
+
+      if (gameRoom.gameType !== 'spy') {
+        socket.emit('error', { message: 'To nie jest gra Spy' });
+        return;
+      }
+
+      // Sprawdź czy to mistrz gry
+      if (gameRoom.gameState.gameMaster !== guestToken) {
+        socket.emit('error', { message: 'Tylko mistrz gry może rozpocząć grę' });
+        return;
+      }
+
+      // Sprawdź minimum 4 graczy (włącznie z mistrzem = 5 osób)
+      if (gameRoom.players.length < 5) {
+        socket.emit('error', { message: 'Minimum 4 uczestników + mistrz gry (łącznie 5 osób)' });
+        return;
+      }
+
+      // Sprawdź czy liczba szpiegów jest ustawiona
+      if (!gameRoom.gameState.spyCount) {
+        socket.emit('error', { message: 'Najpierw ustaw liczbę szpiegów' });
+        return;
+      }
+
+      // Losuj miejsce
+      const location = getRandomLocation();
+      gameRoom.gameState.selectedLocation = location;
+
+      // Pobierz uczestników (wszyscy oprócz mistrza)
+      const participants = gameRoom.players.filter(p => p.token !== guestToken);
+      gameRoom.gameState.participants = participants.map(p => ({
+        token: p.token,
+        name: p.name
+      }));
+
+      // Losuj szpiegów
+      const spyTokens = selectRandomSpies(participants, gameRoom.gameState.spyCount);
+
+      // Rozdaj karty
+      gameRoom.gameState.playerCards.clear();
+      participants.forEach(participant => {
+        const card = spyTokens.includes(participant.token) ? 'spy' : 'location';
+        gameRoom.gameState.playerCards.set(participant.token, card);
+      });
+
+      // Mistrz gry też dostaje kartę z miejscem
+      gameRoom.gameState.playerCards.set(guestToken, 'location');
+
+      // Zmień status
+      gameRoom.gameState.status = 'playing';
+
+      // Wyślij karty do każdego gracza osobno
+      gameRoom.players.forEach(player => {
+        const playerCard = gameRoom.gameState.playerCards.get(player.token);
+        const socketId = player.socketId;
+        
+        // Uczestnicy z kartą 'location' widzą miejsce, szpiedzy nie
+        const shouldSeeLocation = playerCard === 'location';
+        
+        io.to(socketId).emit('spy-game-started', {
+          roomId,
+          playerCard,
+          location: shouldSeeLocation ? location : null,
+          participants: gameRoom.gameState.participants
+        });
+      });
+
+      console.log(`🕵️ Spy game started: ${roomId} - miejsce: ${location}`);
+    });
+
+    // Zakończenie gry Spy
+    socket.on('spy-end-game', (data) => {
+      const { roomId } = data;
+      const guestToken = socket.data.guestToken;
+
+      if (!guestToken) {
+        socket.emit('error', { message: 'Musisz być zalogowany jako gość' });
+        return;
+      }
+
+      const gameRoom = activeGameRooms.get(roomId);
+      if (!gameRoom || gameRoom.gameType !== 'spy') {
+        socket.emit('error', { message: 'Gra nie istnieje' });
+        return;
+      }
+
+      // Sprawdź czy to mistrz gry
+      if (gameRoom.gameState.gameMaster !== guestToken) {
+        socket.emit('error', { message: 'Tylko mistrz gry może zakończyć grę' });
+        return;
+      }
+
+      // Zmień status
+      gameRoom.gameState.status = 'finished';
+
+      // Powiadom wszystkich
+      io.to(roomId).emit('spy-game-ended', {
+        roomId,
+        location: gameRoom.gameState.selectedLocation,
+        playerCards: Object.fromEntries(gameRoom.gameState.playerCards)
+      });
+
+      console.log(`🕵️ Spy game ended: ${roomId}`);
+    });
+
+    // Nowa gra Spy (restart z tymi samymi graczami)
+    socket.on('spy-new-game', (data) => {
+      const { roomId } = data;
+      const guestToken = socket.data.guestToken;
+
+      if (!guestToken) {
+        socket.emit('error', { message: 'Musisz być zalogowany jako gość' });
+        return;
+      }
+
+      const gameRoom = activeGameRooms.get(roomId);
+      if (!gameRoom || gameRoom.gameType !== 'spy') {
+        socket.emit('error', { message: 'Gra nie istnieje' });
+        return;
+      }
+
+      // Sprawdź czy to mistrz gry
+      if (gameRoom.gameState.gameMaster !== guestToken) {
+        socket.emit('error', { message: 'Tylko mistrz gry może rozpocząć nową grę' });
+        return;
+      }
+
+      // Reset stanu gry
+      gameRoom.gameState.status = 'waiting';
+      gameRoom.gameState.spyCount = null;
+      gameRoom.gameState.selectedLocation = null;
+      gameRoom.gameState.playerCards.clear();
+      gameRoom.gameState.participants = [];
+
+      // Powiadom wszystkich
+      io.to(roomId).emit('spy-game-reset', {
+        roomId,
+        players: gameRoom.players.map(p => ({
+          token: p.token,
+          name: p.name
+        }))
+      });
+
+      console.log(`🕵️ Spy game reset: ${roomId}`);
     });
 
     // Rozłączenie

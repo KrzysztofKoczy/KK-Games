@@ -1,0 +1,187 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>🕵️ Szpieg - Gra</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+  <div class="container">
+    <!-- Informacje o pokoju -->
+    <ion-card>
+      <ion-card-header>
+        <ion-card-title>Pokój: {{ roomId() }}</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <p>Gracze w grze ({{ players().length }}):</p>
+        <ion-list>
+          @for (player of players(); track player.token) {
+            <ion-item>
+              <ion-label>
+                {{ player.name }}
+                @if (player.token === currentPlayerToken()) {
+                  <span class="you-badge">(Ty)</span>
+                }
+                @if (isGameMaster() && player.token === players()[0]?.token) {
+                  <span class="master-badge">👑 Mistrz</span>
+                }
+              </ion-label>
+            </ion-item>
+          }
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Faza oczekiwania -->
+    @if (gamePhase() === 'waiting') {
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Oczekiwanie na graczy</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <p>Minimum 4 uczestników + mistrz gry (łącznie 5 osób)</p>
+          <p>Aktualnie: {{ players().length }} graczy</p>
+        </ion-card-content>
+      </ion-card>
+    }
+
+    <!-- Faza konfiguracji (tylko dla mistrza) -->
+    @if (gamePhase() === 'waiting' || gamePhase() === 'configuring') {
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Konfiguracja gry</ion-card-title>
+        </ion-card-header>
+        @if (isGameMaster()) {
+          <ion-card-content>
+            <p>Uczestnicy (bez Ciebie): {{ participants().length }}</p>
+            <ion-item>
+              <ion-label>Liczba szpiegów:</ion-label>
+              <ion-select [value]="spyCount()" (ionChange)="spyCount.set($any($event).detail.value)">
+                @for (count of spyCountOptions(); track count) {
+                  <ion-select-option [value]="count">
+                    {{ count }}
+                  </ion-select-option>
+                }
+              </ion-select>
+            </ion-item>
+            <ion-button expand="block" (click)="configureSpyCount()" [disabled]="participants().length < 4">
+              Zapisz konfigurację
+            </ion-button>
+            <ion-button 
+              expand="block" 
+              color="success" 
+              (click)="startGame()" 
+              [disabled]="players().length < 5 || !spyCount() || gamePhase() !== 'configuring'"
+              class="start-button"
+            >
+              🎮 Start gry
+            </ion-button>
+          </ion-card-content>
+        } @else {
+          <ion-card-content>
+            <p>Oczekiwanie na konfigurację przez mistrza gry...</p>
+          </ion-card-content>
+        }
+      </ion-card>
+    }
+
+    <!-- Faza rozgrywki - Karta gracza -->
+    @if (gamePhase() === 'playing') {
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Twoja karta</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <div class="card-container" (click)="flipCard()">
+            <div class="card" [class.flipped]="cardFlipped()">
+              <div class="card-front">
+                <div class="card-back-content">
+                  <p>🕵️</p>
+                  <p>Kliknij aby odkryć</p>
+                </div>
+              </div>
+              <div class="card-back">
+                <div class="card-content" [class.spy-card]="playerCard() === 'spy'" [class.location-card]="playerCard() === 'location'">
+                  @if (playerCard() === 'spy') {
+                    <h2 class="spy-text">🕵️ SZPIEG</h2>
+                  }
+                  @if (playerCard() === 'location' && location()) {
+                    <h2 class="location-text">
+                      📍 {{ location() }}
+                    </h2>
+                  }
+                  @if (playerCard() === 'location' && !location()) {
+                    <h2 class="location-text">
+                      📍 {{ location() || 'Miejsce' }}
+                    </h2>
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    }
+
+    <!-- Informacje dla mistrza podczas gry -->
+    @if (gamePhase() === 'playing' && isGameMaster() && location()) {
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>👑 Mistrz gry</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <p><strong>Wylosowane miejsce:</strong></p>
+          <p class="location-display">{{ location() }}</p>
+        </ion-card-content>
+      </ion-card>
+    }
+
+    <!-- Przyciski kontrolne dla mistrza -->
+    @if (gamePhase() === 'playing' && isGameMaster()) {
+      <ion-card>
+        <ion-card-content>
+          <ion-button expand="block" color="danger" (click)="endGame()">
+            Zakończ grę
+          </ion-button>
+          <ion-button expand="block" color="secondary" (click)="newGame()" class="new-game-button">
+            Nowa gra
+          </ion-button>
+        </ion-card-content>
+      </ion-card>
+    }
+
+    <!-- Faza zakończenia -->
+    @if (gamePhase() === 'finished') {
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Gra zakończona</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <p>Gra została zakończona przez mistrza gry.</p>
+          @if (isGameMaster()) {
+            <ion-button expand="block" color="secondary" (click)="newGame()">
+              Nowa gra
+            </ion-button>
+          }
+        </ion-card-content>
+      </ion-card>
+    }
+
+    <!-- Przycisk opuszczenia (tylko dla uczestników) -->
+    @if (!isGameMaster()) {
+      <ion-button 
+        expand="block" 
+        color="danger" 
+        (click)="leaveGame()"
+      >
+        Opuść grę
+      </ion-button>
+    }
+  </div>
+
+  <ion-toast
+    [isOpen]="showToast()"
+    [message]="toastMessage()"
+    [duration]="3000"
+    (didDismiss)="showToast.set(false)"
+  ></ion-toast>
+</ion-content>

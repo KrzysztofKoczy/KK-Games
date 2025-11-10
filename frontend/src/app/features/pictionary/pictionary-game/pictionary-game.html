@@ -13,10 +13,14 @@
       <ion-card-content>
         <p>Gracze w grze ({{ players().length }}/{{ maxPlayers() }}):</p>
         <ion-list>
-          <ion-item *ngFor="let player of players()">
-            <ion-label>{{ player.name }}</ion-label>
-            <ion-badge *ngIf="player.token === currentPlayerToken()" color="primary">Ty</ion-badge>
-          </ion-item>
+          @for (player of players(); track player.token) {
+            <ion-item>
+              <ion-label>{{ player.name }}</ion-label>
+              @if (player.token === currentPlayerToken()) {
+                <ion-badge color="primary">Ty</ion-badge>
+              }
+            </ion-item>
+          }
         </ion-list>
       </ion-card-content>
     </ion-card>

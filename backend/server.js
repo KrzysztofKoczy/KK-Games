@@ -3,6 +3,9 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { setupSocketIO } from './src/sockets/socketHandler.js';
 import { setupDatabase } from './src/config/database.js';
 
@@ -28,6 +31,20 @@ app.use(express.json());
 // Routes
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
+});
+
+// Spy game - pobieranie miejsc
+app.get('/api/spy/locations', (req, res) => {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const locationsPath = join(__dirname, 'src', 'data', 'locations.json');
+    const locationsData = JSON.parse(readFileSync(locationsPath, 'utf-8'));
+    res.json({ locations: locationsData.locations });
+  } catch (error) {
+    console.error('Error loading locations:', error);
+    res.status(500).json({ error: 'Nie udało się załadować miejsc' });
+  }
 });
 
 // Socket.io setup
